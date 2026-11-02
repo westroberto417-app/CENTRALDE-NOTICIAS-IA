@@ -1,0 +1,6 @@
+{
+  "name": "Central de Noticias IA – Radio Corrientes Viva",
+  "description": "Central automatizada de producción periodística y generación de boletines de audio MP3 para Radio Corrientes Viva.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}

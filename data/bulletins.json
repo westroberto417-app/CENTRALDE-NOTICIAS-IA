@@ -1,0 +1,68 @@
+[
+  {
+    "id": "draft-rcv-demo",
+    "title": "Panorama Informativo Central - Radio Corrientes Viva (Edición Mañana)",
+    "stationName": "Radio Corrientes Viva",
+    "createdAt": "2026-11-01T15:22:54.433Z",
+    "timePeriod": "6h",
+    "segments": [
+      {
+        "id": "seg-apertura",
+        "type": "apertura",
+        "title": "Apertura Institucional",
+        "text": "Muy buenos días a toda la provincia de Corrientes y la región del Litoral. En el aire de Radio Corrientes Viva, en el noventa y siete punto uno del dial, comienza la síntesis informativa de esta hora. Estos son los acontecimientos más destacados del Taragüí y la región."
+      },
+      {
+        "id": "seg-trans-1",
+        "type": "transicion",
+        "text": "Comenzamos con la información más importante del ámbito local y productivo:"
+      },
+      {
+        "id": "seg-news-1",
+        "type": "noticia",
+        "title": "Producción y desarrollo en Corrientes",
+        "category": "Noticias Locales",
+        "text": "Avanzan las iniciativas de fomento a las economías regionales en los departamentos del interior correntino con fuerte impulso al sector foresto-industrial y citrícola.",
+        "sourceAttribution": "Información verificada de Diario El Libertador (Corrientes)",
+        "sourceUrl": "https://diarioellibertador.com.ar",
+        "requiresReview": false,
+        "isApproved": true
+      },
+      {
+        "id": "seg-trans-2",
+        "type": "transicion",
+        "text": "Pasamos al panorama regional del Litoral y los ríos:"
+      },
+      {
+        "id": "seg-news-2",
+        "type": "noticia",
+        "title": "Situación hidrológica y clima en la cuenca del Río Paraná",
+        "category": "Clima",
+        "text": "Prefectura Naval y el Instituto Nacional del Agua informan niveles estables en los hidrómetros de Corrientes Capital e Ituzaingó, con pronóstico de jornadas cálidas en todo el Litoral.",
+        "sourceAttribution": "Servicio de noticias de Chaco Día por Día y Prefectura",
+        "sourceUrl": "https://www.chacodiapordia.com",
+        "requiresReview": false,
+        "isApproved": true
+      },
+      {
+        "id": "seg-cierre",
+        "type": "cierre",
+        "title": "Cierre Institucional",
+        "text": "Hasta aquí las principales noticias en el resumen de Radio Corrientes Viva. Seguí conectado con nosotros en el 97.1 del dial y en nuestra transmisión online durante todo el día. Información al instante con la voz del Taragüí."
+      }
+    ],
+    "fullScript": "Muy buenos días a toda la provincia de Corrientes y la región del Litoral. En el aire de Radio Corrientes Viva, comienza la síntesis informativa. Avanzan las iniciativas de fomento a las economías regionales. Prefectura informa niveles estables en los hidrómetros del Río Paraná. Hasta aquí las principales noticias en el 97.1 del dial.",
+    "audioUrl": "/api/audio/file/boletin-rcv-1793546415330-1793546415330.mp3",
+    "audioFilename": "boletin-rcv-1793546415330-1793546415330.mp3",
+    "audioDurationSeconds": 15,
+    "voiceId": "kore-arg",
+    "voiceName": "Lucía - Institucional & Cercana",
+    "selectedNewsCount": 2,
+    "sourcesUsed": [
+      "Diario El Libertador (Corrientes)",
+      "Chaco Día por Día (Litoral NEA)"
+    ],
+    "status": "synthesized",
+    "fileFormat": "mp3"
+  }
+]
