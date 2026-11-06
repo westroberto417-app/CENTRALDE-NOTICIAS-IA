@@ -1,0 +1,16 @@
+{
+  "stationName": "Radio Corrientes Viva",
+  "networkName": "Central de Noticias IA",
+  "dialFrequency": "Radio Online",
+  "slogan": "La voz del Taragüí con toda la información al instante",
+  "broadcasterName": "Juan Carlos Romero y Mariana Fernández",
+  "cityCountry": "Corrientes, Argentina",
+  "openingTemplate": "Muy buenos días a toda la provincia de Corrientes y la región del Litoral. En el aire de {EMISORA}, comienza la síntesis informativa de esta hora. Estos son los acontecimientos más relevantes.",
+  "closingTemplate": "Hasta aquí las principales noticias en el resumen de {EMISORA}. Seguí conectado con nosotros a través de nuestra transmisión digital para más actualizaciones. Redacción e informe periodístico continuo.",
+  "styleTone": "periodistico",
+  "defaultVoiceId": "kore-arg",
+  "musicBedEnabled": true,
+  "musicBedVolume": 0.25,
+  "maxDailyAudios": 20,
+  "selectedCurtainId": "curtain-rcv-institucional"
+}

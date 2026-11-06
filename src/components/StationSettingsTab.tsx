@@ -11,8 +11,11 @@ import {
   AlertCircle,
   BarChart3,
   Database,
+  Smartphone,
 } from 'lucide-react';
 import { StationConfig, VoiceOption } from '../types';
+import { BackgroundMusicDuckingControl } from './BackgroundMusicDuckingControl';
+import { PWAInstallButton } from './PWAInstallButton';
 
 interface StationSettingsTabProps {
   station: StationConfig;
@@ -100,7 +103,7 @@ export const StationSettingsTab: React.FC<StationSettingsTabProps> = ({
                 value={form.dialFrequency}
                 onChange={(e) => setForm({ ...form, dialFrequency: e.target.value })}
                 className="w-full bg-slate-950 border border-slate-800 rounded-lg px-3 py-2 text-white text-xs focus:outline-none focus:border-blue-500"
-                placeholder="FM 97.1 / Online"
+                placeholder="Radio Online / Transmisión Oficial"
               />
             </div>
 
@@ -239,6 +242,37 @@ export const StationSettingsTab: React.FC<StationSettingsTabProps> = ({
                 className="w-full bg-slate-950 border border-slate-800 rounded-lg p-3 text-white text-xs focus:outline-none focus:border-blue-500 leading-relaxed font-sans"
               />
             </div>
+          </div>
+        </div>
+
+        {/* Background Music & Audio Ducking Control */}
+        <div>
+          <h3 className="text-sm font-bold text-white uppercase tracking-wider flex items-center gap-2 mb-3">
+            <Music className="w-4 h-4 text-amber-400" />
+            <span>Música de Fondo, Cortinas Radiales y Efecto Ducking</span>
+          </h3>
+          <BackgroundMusicDuckingControl
+            station={form}
+            onUpdateStation={(partial) => setForm((prev) => ({ ...prev, ...partial }))}
+          />
+        </div>
+
+        {/* PWA Mobile & Desktop App Section */}
+        <div className="bg-slate-900 border border-slate-800 rounded-xl p-5 space-y-3">
+          <div className="flex items-center justify-between">
+            <h3 className="text-sm font-bold text-white uppercase tracking-wider flex items-center gap-2">
+              <Smartphone className="w-4 h-4 text-emerald-400" />
+              <span>Aplicación Progresiva (PWA) para Android y Computadora</span>
+            </h3>
+            <span className="text-[10px] px-2 py-0.5 rounded-full bg-emerald-500/20 text-emerald-300 border border-emerald-500/30 font-semibold">
+              Instalable
+            </span>
+          </div>
+          <p className="text-xs text-slate-400">
+            Instala Radio Corrientes Viva como una aplicación nativa en tu teléfono Android, tablet o computadora (Windows/Mac/Linux) para acceso instantáneo con un toque, pantalla completa y soporte sin conexión.
+          </p>
+          <div className="pt-2">
+            <PWAInstallButton variant="settings" />
           </div>
         </div>
 

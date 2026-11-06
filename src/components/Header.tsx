@@ -1,12 +1,15 @@
 import React, { useState, useEffect } from 'react';
-import { Radio, Clock, Sparkles, CheckCircle2, AlertCircle, BarChart3 } from 'lucide-react';
+import { Radio, Clock, Sparkles, CheckCircle2, AlertCircle, BarChart3, Share2 } from 'lucide-react';
 import { StationConfig } from '../types';
+import { PWAInstallButton } from './PWAInstallButton';
 
 interface HeaderProps {
   station: StationConfig;
   hasGeminiKey: boolean;
   onOpenTestModal: () => void;
   onOpenCostModal: () => void;
+  onOpenSessionModal: () => void;
+  sessionId: string;
   activeTab: string;
 }
 
@@ -15,6 +18,8 @@ export const Header: React.FC<HeaderProps> = ({
   hasGeminiKey,
   onOpenTestModal,
   onOpenCostModal,
+  onOpenSessionModal,
+  sessionId,
 }) => {
   const [corrientesTime, setCorrientesTime] = useState('');
 
@@ -81,6 +86,20 @@ export const Header: React.FC<HeaderProps> = ({
             >
               <BarChart3 className="w-3.5 h-3.5 text-emerald-400" />
               <span className="hidden sm:inline">Consumo & Costos</span>
+            </button>
+
+            {/* PWA Install Button for Android / Desktop */}
+            <PWAInstallButton variant="header" />
+
+            {/* Shared Session State Sync & JSON Export/Import */}
+            <button
+              onClick={onOpenSessionModal}
+              className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-xs bg-slate-800 hover:bg-slate-700 text-cyan-300 border border-cyan-500/30 transition cursor-pointer"
+              title="Sincronización multi-dispositivo por ID de sesión y exportación/importación JSON local"
+            >
+              <Share2 className="w-3.5 h-3.5 text-cyan-400" />
+              <span className="hidden xl:inline font-mono text-[11px] font-bold">{sessionId}</span>
+              <span className="xl:hidden">Sesión</span>
             </button>
 
             {/* 9-Step Verification Button */}

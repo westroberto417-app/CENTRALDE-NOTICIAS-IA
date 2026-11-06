@@ -14,6 +14,8 @@ export type NewsCategory =
   | 'Tecnología'
   | 'Clima';
 
+export type SourceCategoryMix = Record<string, NewsCategory[]>;
+
 export interface NewsSource {
   id: string;
   name: string;
@@ -137,10 +139,21 @@ export interface ScheduleConfig {
   dailyAudioLimit: number; // e.g. 20 audios per day max
 }
 
+export interface MusicCurtain {
+  id: string;
+  name: string;
+  description: string;
+  type: 'preset' | 'custom' | 'synth';
+  audioUrl?: string;
+  defaultVolume: number;
+  duckingVolume: number;
+  genre?: string;
+}
+
 export interface StationConfig {
   stationName: string; // "Radio Corrientes Viva"
   networkName: string; // "Central de Noticias IA"
-  dialFrequency: string; // "FM 97.1 / Online"
+  dialFrequency: string; // "Radio Online / Transmisión Oficial"
   slogan: string; // "La voz del Taragüí con toda la información al instante"
   broadcasterName: string; // "Juan Carlos Romero y Mariana Fernández"
   cityCountry: string; // "Corrientes, Argentina"
@@ -150,6 +163,10 @@ export interface StationConfig {
   defaultVoiceId: string;
   musicBedEnabled: boolean;
   musicBedVolume: number;
+  musicBedDuckingVolume?: number;
+  selectedCurtainId?: string;
+  customCurtainUrl?: string;
+  customCurtainName?: string;
   maxDailyAudios: number;
 }
 
@@ -162,4 +179,30 @@ export interface UsageStats {
   dailyLimit: number;
   freeTierActive: boolean;
   estimatedCostUsd: number;
+}
+
+export interface SharedSessionState {
+  sessionId: string;
+  name?: string;
+  bulletins: BulletinDraft[];
+  activeDraft?: BulletinDraft | null;
+  lastUpdated: string;
+  stationName?: string;
+  deviceRole?: 'redactor' | 'locutor' | 'operador' | 'general';
+}
+
+export interface SessionExportPayload {
+  schemaVersion: '2.0';
+  exportType: 'rcv_session_bulletins_history';
+  sessionId: string;
+  exportedAt: string;
+  stationName: string;
+  totalBulletins: number;
+  bulletins: BulletinDraft[];
+  activeDraft?: BulletinDraft | null;
+  metadata?: {
+    app: string;
+    exportedBy?: string;
+    description: string;
+  };
 }

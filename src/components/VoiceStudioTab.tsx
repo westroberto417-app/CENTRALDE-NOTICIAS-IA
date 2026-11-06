@@ -23,6 +23,8 @@ import {
   AlertCircle,
 } from 'lucide-react';
 import { VoiceOption, BulletinDraft, BulletinSegment, StationConfig } from '../types';
+import { BackgroundMusicDuckingControl } from './BackgroundMusicDuckingControl';
+import { useAudioDuckingPlayer } from '../hooks/useAudioDuckingPlayer';
 import {
   createRadioSoundBed,
   audioBufferToWavBlob,
@@ -35,6 +37,7 @@ interface VoiceStudioTabProps {
   draft: BulletinDraft | null;
   voices: VoiceOption[];
   station: StationConfig;
+  onUpdateStation?: (updated: Partial<StationConfig>) => void;
   onSynthesizeAudio: (
     scriptText: string,
     voiceId: string,
@@ -51,6 +54,7 @@ export const VoiceStudioTab: React.FC<VoiceStudioTabProps> = ({
   draft,
   voices,
   station,
+  onUpdateStation,
   onSynthesizeAudio,
   isSynthesizing,
   onSaveToLibrary,
@@ -65,7 +69,7 @@ export const VoiceStudioTab: React.FC<VoiceStudioTabProps> = ({
     station.styleTone || 'periodistico'
   );
   const [includeCortina, setIncludeCortina] = useState<boolean>(station.musicBedEnabled ?? true);
-  const [cortinaVolume, setCortinaVolume] = useState<number>(station.musicBedVolume || 0.18);
+  const [cortinaVolume, setCortinaVolume] = useState<number>(station.musicBedVolume || 0.45);
 
   // Player state
   const [audioUrl, setAudioUrl] = useState<string | null>(draft?.audioUrl || null);
@@ -74,12 +78,24 @@ export const VoiceStudioTab: React.FC<VoiceStudioTabProps> = ({
   const [duration, setDuration] = useState<number>(draft?.audioDurationSeconds || 0);
   const [savedSuccess, setSavedSuccess] = useState<boolean>(false);
   const [fileDetails, setFileDetails] = useState<{ filename: string; sizeKb?: number } | null>(null);
+  const [generateError, setGenerateError] = useState<string | null>(null);
+  const [statusNotice, setStatusNotice] = useState<string | null>(null);
 
   // Browser speech preview state
   const [isBrowserSpeaking, setIsBrowserSpeaking] = useState<boolean>(false);
   const browserUtteranceRef = useRef<SpeechSynthesisUtterance | null>(null);
 
   const audioRef = useRef<HTMLAudioElement | null>(null);
+
+  // Real-time Audio Ducking Player (plays voice and background music with automatic ducking)
+  const duckingPlayer = useAudioDuckingPlayer({
+    voiceAudioUrl: audioUrl,
+    selectedCurtainId: station.selectedCurtainId,
+    customCurtainUrl: station.customCurtainUrl,
+    baseVolume: station.musicBedVolume || 0.45,
+    duckingVolume: station.musicBedDuckingVolume || 0.14,
+    duckingEnabled: station.musicBedEnabled,
+  });
 
   useEffect(() => {
     if (draft?.audioUrl) {
@@ -105,12 +121,12 @@ export const VoiceStudioTab: React.FC<VoiceStudioTabProps> = ({
   };
 
   const togglePlayPause = () => {
-    if (!audioRef.current || !audioUrl) return;
+    if (!audioUrl || !audioRef.current) return;
     if (isPlaying) {
       audioRef.current.pause();
       setIsPlaying(false);
     } else {
-      audioRef.current.play();
+      audioRef.current.play().catch((err) => console.log('Playback error:', err));
       setIsPlaying(true);
     }
   };
@@ -119,9 +135,9 @@ export const VoiceStudioTab: React.FC<VoiceStudioTabProps> = ({
     if (audioRef.current) {
       audioRef.current.pause();
       audioRef.current.currentTime = 0;
-      setIsPlaying(false);
-      setCurrentTime(0);
     }
+    setIsPlaying(false);
+    setCurrentTime(0);
   };
 
   const handleSeek = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -138,17 +154,29 @@ export const VoiceStudioTab: React.FC<VoiceStudioTabProps> = ({
       if ('speechSynthesis' in window) {
         window.speechSynthesis.cancel();
       }
+      duckingPlayer.stop();
       setIsBrowserSpeaking(false);
       return;
     }
 
-    if (!draft?.fullScript) return;
+    const textToSpeak =
+      draft?.fullScript?.trim() ||
+      draft?.segments?.map((s) => s.text).filter(Boolean).join('\n\n') ||
+      '';
+
+    if (!textToSpeak) return;
 
     setIsBrowserSpeaking(true);
-    const utterance = speakWithWebSpeech(draft.fullScript, {
+    if (station.musicBedEnabled) {
+      duckingPlayer.play();
+    }
+    const utterance = speakWithWebSpeech(textToSpeak, {
       rate: readingSpeed,
       pitch: readingPitch,
-      onEnd: () => setIsBrowserSpeaking(false),
+      onEnd: () => {
+        setIsBrowserSpeaking(false);
+        duckingPlayer.stop();
+      },
     });
     browserUtteranceRef.current = utterance;
   };
@@ -156,14 +184,32 @@ export const VoiceStudioTab: React.FC<VoiceStudioTabProps> = ({
   // Generate Real MP3 via Gemini 3.8 Flash-Lite TTS + server lamejs
   const handleGenerateMp3 = async () => {
     if (!draft) return;
+    setGenerateError(null);
+    setStatusNotice(null);
+
     if (isBrowserSpeaking) {
-      window.speechSynthesis.cancel();
+      if ('speechSynthesis' in window) {
+        window.speechSynthesis.cancel();
+      }
+      duckingPlayer.stop();
       setIsBrowserSpeaking(false);
+    }
+
+    const textToSynthesize =
+      draft.fullScript?.trim() ||
+      draft.segments?.map((s) => s.text).filter(Boolean).join('\n\n') ||
+      '';
+
+    if (!textToSynthesize) {
+      setGenerateError(
+        'El borrador no contiene texto para sintetizar. Regresa a la pestaña "Boletín" para redactar o estructurar las noticias.'
+      );
+      return;
     }
 
     try {
       const result = await onSynthesizeAudio(
-        draft.fullScript,
+        textToSynthesize,
         selectedVoiceId,
         readingSpeed,
         readingPitch,
@@ -174,8 +220,15 @@ export const VoiceStudioTab: React.FC<VoiceStudioTabProps> = ({
       setDuration(result.durationSeconds);
       setFileDetails({ filename: result.filename, sizeKb: result.fileSizeKb });
       setIsPlaying(false);
+
+      if ((result as any)?.isAssistedBed) {
+        setStatusNotice(
+          'Banda sonora MP3 generada con la cortina musical y ducking para Radio Corrientes Viva. Para salida en vivo puedes sincronizar la lectura con "Vista Previa (Navegador)".'
+        );
+      }
     } catch (err: any) {
-      console.error(err);
+      console.error('Error generating MP3:', err);
+      setGenerateError(err?.message || 'Error al procesar y codificar el archivo MP3.');
     }
   };
 
@@ -251,7 +304,48 @@ export const VoiceStudioTab: React.FC<VoiceStudioTabProps> = ({
         </div>
       </div>
 
-      {/* Distinction Guide Notice */}
+      {/* Generation Error Alert */}
+      {generateError && (
+        <div className="bg-rose-500/10 border border-rose-500/30 rounded-xl p-4 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 text-xs shadow-lg">
+          <div className="flex items-start gap-2.5">
+            <AlertCircle className="w-4 h-4 text-rose-400 flex-shrink-0 mt-0.5" />
+            <div>
+              <strong className="text-rose-200 block font-bold">Aviso en Generación de Audio:</strong>
+              <p className="text-rose-300/90 text-[11px] mt-0.5">{generateError}</p>
+            </div>
+          </div>
+          <div className="flex items-center gap-2 self-end sm:self-auto flex-shrink-0">
+            <button
+              onClick={handleBrowserPreview}
+              className="px-3 py-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-200 font-semibold text-xs border border-slate-700 transition cursor-pointer"
+            >
+              Usar Locución del Navegador
+            </button>
+            <button
+              onClick={handleGenerateMp3}
+              className="px-3.5 py-1.5 rounded-lg bg-rose-600 hover:bg-rose-500 text-white font-semibold text-xs transition cursor-pointer"
+            >
+              Reintentar
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* Status Notice */}
+      {statusNotice && (
+        <div className="bg-cyan-500/10 border border-cyan-500/30 rounded-xl p-3.5 flex items-center justify-between gap-3 text-xs shadow-lg">
+          <div className="flex items-center gap-2 text-cyan-200 text-xs">
+            <Sparkles className="w-4 h-4 text-cyan-400 flex-shrink-0" />
+            <span>{statusNotice}</span>
+          </div>
+          <button
+            onClick={() => setStatusNotice(null)}
+            className="text-slate-400 hover:text-white text-xs px-2 py-0.5 cursor-pointer"
+          >
+            ✕
+          </button>
+        </div>
+      )}
       <div className="grid grid-cols-1 md:grid-cols-2 gap-3 text-xs">
         <div className="bg-slate-900 border border-slate-800 p-3.5 rounded-xl flex items-start gap-2.5">
           <Volume2 className="w-4 h-4 text-cyan-400 flex-shrink-0 mt-0.5" />
@@ -419,52 +513,11 @@ export const VoiceStudioTab: React.FC<VoiceStudioTabProps> = ({
           </div>
         </div>
 
-        {/* Cortina Musical Settings */}
-        <div className="bg-slate-900 border border-slate-800 rounded-xl p-5 space-y-4">
-          <div className="flex items-center justify-between">
-            <h3 className="text-sm font-bold text-white flex items-center gap-2">
-              <Music className="w-4 h-4 text-amber-400" />
-              <span>Cortina Musical y Bumper de Emisora</span>
-            </h3>
-            <label className="relative inline-flex items-center cursor-pointer">
-              <input
-                type="checkbox"
-                checked={includeCortina}
-                onChange={(e) => setIncludeCortina(e.target.checked)}
-                className="sr-only peer"
-              />
-              <div className="w-9 h-5 bg-slate-700 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-blue-600"></div>
-            </label>
-          </div>
-
-          <p className="text-xs text-slate-400 leading-relaxed">
-            Sintonía de apertura con ritmo radiofónico y <em>audio ducking</em> (la música reduce su volumen automáticamente durante la locución).
-          </p>
-
-          {includeCortina && (
-            <div className="space-y-1.5 pt-1 border-t border-slate-800">
-              <div className="flex justify-between text-xs">
-                <span className="text-slate-400">Volumen de la Cortina de Fondo</span>
-                <span className="font-mono font-bold text-white">
-                  {Math.round(cortinaVolume * 100)}%
-                </span>
-              </div>
-              <input
-                type="range"
-                min="0.05"
-                max="0.4"
-                step="0.02"
-                value={cortinaVolume}
-                onChange={(e) => setCortinaVolume(parseFloat(e.target.value))}
-                className="w-full accent-amber-500 cursor-pointer"
-              />
-            </div>
-          )}
-
-          <div className="text-[11px] text-slate-400 bg-slate-950 p-2.5 rounded-lg border border-slate-800">
-            Identificación de emisora: <strong className="text-amber-300">{station.stationName}</strong> ({station.dialFrequency})
-          </div>
-        </div>
+        {/* Cortina Musical Settings with Manual Upload & Audio Ducking */}
+        <BackgroundMusicDuckingControl
+          station={station}
+          onUpdateStation={onUpdateStation}
+        />
       </div>
 
       {/* Main Broadcast MP3 Audio Player */}
@@ -484,9 +537,17 @@ export const VoiceStudioTab: React.FC<VoiceStudioTabProps> = ({
 
           <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
             <div>
-              <span className="px-2 py-0.5 rounded text-[10px] font-bold uppercase tracking-wider bg-emerald-500/20 text-emerald-300 border border-emerald-500/30">
-                Archivo MP3 Codificado y Listo
-              </span>
+              <div className="flex items-center gap-2 flex-wrap">
+                <span className="px-2 py-0.5 rounded text-[10px] font-bold uppercase tracking-wider bg-emerald-500/20 text-emerald-300 border border-emerald-500/30">
+                  Archivo MP3 Codificado y Listo
+                </span>
+                {station.musicBedEnabled && (
+                  <span className="px-2 py-0.5 rounded text-[10px] font-bold uppercase tracking-wider bg-amber-500/20 text-amber-300 border border-amber-500/30 flex items-center gap-1">
+                    <Music className="w-3 h-3" />
+                    <span>Música de Fondo + Ducking Integrado</span>
+                  </span>
+                )}
+              </div>
               <h3 className="text-lg font-bold text-white mt-1">
                 {draft?.title || 'Boletín Radial - Radio Corrientes Viva'}
               </h3>

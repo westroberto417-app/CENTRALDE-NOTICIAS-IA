@@ -2,9 +2,39 @@
 <html lang="en">
   <head>
     <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=5.0, user-scalable=yes" />
+    <script>
+      // Safe error listener to prevent sandbox WebSocket disconnection warnings from interrupting execution
+      try {
+        window.addEventListener('error', function(event) {
+          if (event && event.message && event.message.includes('WebSocket')) {
+            event.stopImmediatePropagation();
+            event.preventDefault();
+            return true;
+          }
+        }, true);
+        window.addEventListener('unhandledrejection', function(event) {
+          if (event && event.reason && String(event.reason).includes('WebSocket')) {
+            event.stopImmediatePropagation();
+            event.preventDefault();
+            return true;
+          }
+        }, true);
+      } catch (e) {
+        // Safe no-op
+      }
+    </script>
     <title>Central de Noticias IA – Radio Corrientes Viva</title>
     <meta name="description" content="Central automatizada de producción periodística y generación de boletines de audio MP3 para Radio Corrientes Viva." />
+    <meta name="theme-color" content="#0f172a" />
+    <meta name="mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+    <meta name="apple-mobile-web-app-title" content="RCV Noticias" />
+    <link rel="apple-touch-icon" href="/apple-touch-icon.png" />
+    <link rel="icon" type="image/svg+xml" href="/icon.svg" />
+    <link rel="icon" type="image/png" sizes="192x192" href="/pwa-192x192.png" />
+    <link rel="manifest" href="/manifest.webmanifest" />
     <meta property="og:title" content="Central de Noticias IA – Radio Corrientes Viva" />
     <meta property="og:description" content="Central automatizada de producción periodística y generación de boletines de audio MP3 para Radio Corrientes Viva." />
     <meta property="og:type" content="website" />

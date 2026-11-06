@@ -10,7 +10,7 @@
         "id": "seg-apertura",
         "type": "apertura",
         "title": "Apertura Institucional",
-        "text": "Muy buenos días a toda la provincia de Corrientes y la región del Litoral. En el aire de Radio Corrientes Viva, en el noventa y siete punto uno del dial, comienza la síntesis informativa de esta hora. Estos son los acontecimientos más destacados del Taragüí y la región."
+        "text": "Muy buenos días a toda la provincia de Corrientes y la región del Litoral. En el aire de Radio Corrientes Viva, comienza la síntesis informativa de esta hora. Estos son los acontecimientos más destacados del Taragüí y la región."
       },
       {
         "id": "seg-trans-1",
@@ -48,10 +48,10 @@
         "id": "seg-cierre",
         "type": "cierre",
         "title": "Cierre Institucional",
-        "text": "Hasta aquí las principales noticias en el resumen de Radio Corrientes Viva. Seguí conectado con nosotros en el 97.1 del dial y en nuestra transmisión online durante todo el día. Información al instante con la voz del Taragüí."
+        "text": "Hasta aquí las principales noticias en el resumen de Radio Corrientes Viva. Seguí conectado con nosotros en nuestra transmisión online durante todo el día. Información al instante con la voz del Taragüí."
       }
     ],
-    "fullScript": "Muy buenos días a toda la provincia de Corrientes y la región del Litoral. En el aire de Radio Corrientes Viva, comienza la síntesis informativa. Avanzan las iniciativas de fomento a las economías regionales. Prefectura informa niveles estables en los hidrómetros del Río Paraná. Hasta aquí las principales noticias en el 97.1 del dial.",
+    "fullScript": "Muy buenos días a toda la provincia de Corrientes y la región del Litoral. En el aire de Radio Corrientes Viva, comienza la síntesis informativa. Avanzan las iniciativas de fomento a las economías regionales. Prefectura informa niveles estables en los hidrómetros del Río Paraná. Hasta aquí las principales noticias en el resumen informativo.",
     "audioUrl": "/api/audio/file/boletin-rcv-1793546415330-1793546415330.mp3",
     "audioFilename": "boletin-rcv-1793546415330-1793546415330.mp3",
     "audioDurationSeconds": 15,
@@ -64,5 +64,19 @@
     ],
     "status": "synthesized",
     "fileFormat": "mp3"
+  },
+  {
+    "id": "test-import-1",
+    "title": "Boletin Prueba Importacion",
+    "stationName": "Radio Corrientes Viva",
+    "createdAt": "2026-11-05T12:00:00Z",
+    "timePeriod": "1h",
+    "segments": [],
+    "fullScript": "Texto prueba",
+    "selectedNewsCount": 3,
+    "sourcesUsed": [
+      "El Libertador"
+    ],
+    "status": "draft"
   }
 ]

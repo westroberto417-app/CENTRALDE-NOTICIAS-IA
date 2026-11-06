@@ -243,6 +243,11 @@ export const BulletinEditorTab: React.FC<BulletinEditorTabProps> = ({
           const isApertura = seg.type === 'apertura';
           const isCierre = seg.type === 'cierre';
           const isTransicion = seg.type === 'transicion';
+          const totalNewsCount = draft.segments.filter((s) => s.type === 'noticia').length;
+          const currentNewsNumber =
+            !isApertura && !isCierre && !isTransicion
+              ? draft.segments.slice(0, idx + 1).filter((s) => s.type === 'noticia').length
+              : 0;
 
           return (
             <div
@@ -267,7 +272,7 @@ export const BulletinEditorTab: React.FC<BulletinEditorTabProps> = ({
                         ? 'bg-amber-500/20 text-amber-300 border border-amber-500/30'
                         : isTransicion
                         ? 'bg-slate-800 text-slate-400'
-                        : 'bg-emerald-500/10 text-emerald-300 border border-emerald-500/20'
+                        : 'bg-emerald-500/20 text-emerald-300 border border-emerald-500/30 font-extrabold'
                     }`}
                   >
                     {isApertura
@@ -276,7 +281,7 @@ export const BulletinEditorTab: React.FC<BulletinEditorTabProps> = ({
                       ? '4. Cierre del Boletín'
                       : isTransicion
                       ? '3. Transición Radial'
-                      : `2. Noticia`}
+                      : `2. Noticia ${currentNewsNumber} de ${totalNewsCount}`}
                   </span>
 
                   {seg.category && (

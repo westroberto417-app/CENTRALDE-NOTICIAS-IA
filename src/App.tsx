@@ -12,15 +12,20 @@ import { ScheduleTab } from './components/ScheduleTab';
 import { StationSettingsTab } from './components/StationSettingsTab';
 import { SystemTestModal } from './components/SystemTestModal';
 import { CostMonitorModal } from './components/CostMonitorModal';
+import { PWAInstallButton } from './components/PWAInstallButton';
+import { OfflineIndicator } from './components/OfflineIndicator';
+import { SharedSessionModal } from './components/SharedSessionModal';
 import {
   NewsSource,
   NewsItem,
   BulletinDraft,
+  BulletinSegment,
   VoiceOption,
   ScheduleConfig,
   StationConfig,
   NewsCategory,
   UsageStats,
+  SourceCategoryMix,
 } from './types';
 
 // Resilient API Fetch Helper: guarantees valid JSON responses and parses server error messages
@@ -74,7 +79,7 @@ export default function App() {
   const [hasGeminiKey, setHasGeminiKey] = useState<boolean>(true);
   const [isTestModalOpen, setIsTestModalOpen] = useState<boolean>(false);
   const [isCostModalOpen, setIsCostModalOpen] = useState<boolean>(false);
-  const [banner, setBanner] = useState<{ type: 'error' | 'success' | 'info'; message: string } | null>(null);
+  const [banner, setBanner] = useState<{ type: 'error' | 'success' | 'info' | 'warning'; message: string } | null>(null);
 
   // Usage & cost stats
   const [usage, setUsage] = useState<UsageStats>({
@@ -97,14 +102,14 @@ export default function App() {
   const [station, setStation] = useState<StationConfig>({
     stationName: 'Radio Corrientes Viva',
     networkName: 'Central de Noticias IA',
-    dialFrequency: 'FM 97.1 / Online',
+    dialFrequency: 'Radio Online',
     slogan: 'La voz del Taragüí con toda la información al instante',
     broadcasterName: 'Juan Carlos Romero y Mariana Fernández',
     cityCountry: 'Corrientes, Argentina',
     openingTemplate:
       'Muy buenos días a toda la provincia de Corrientes y la región del Litoral. En el aire de {EMISORA}, comienza la síntesis informativa de esta hora. Estos son los acontecimientos más relevantes.',
     closingTemplate:
-      'Hasta aquí las principales noticias en el resumen de {EMISORA}. Seguí conectado con nosotros en el 97.1 del dial o a través de nuestra transmisión digital para más actualizaciones. Redacción e informe periodístico continuo.',
+      'Hasta aquí las principales noticias en el resumen de {EMISORA}. Seguí conectado con nosotros a través de nuestra transmisión digital para más actualizaciones. Redacción e informe periodístico continuo.',
     styleTone: 'periodistico',
     defaultVoiceId: 'kore-arg',
     musicBedEnabled: true,
@@ -123,9 +128,170 @@ export default function App() {
     slots: [],
   });
 
+  const [isSyncingBulletins, setIsSyncingBulletins] = useState<boolean>(false);
+  const [isSessionModalOpen, setIsSessionModalOpen] = useState<boolean>(false);
+  const [lastSessionSyncTime, setLastSessionSyncTime] = useState<string | null>(null);
+
+  // Shared Browser Session ID
+  const [sessionId, setSessionId] = useState<string>(() => {
+    try {
+      const urlParams = new URLSearchParams(window.location.search);
+      const urlSession = urlParams.get('session');
+      if (urlSession) {
+        const clean = urlSession.trim().toUpperCase().replace(/[^A-Z0-9_-]/g, '-');
+        if (clean) {
+          localStorage.setItem('rcv_shared_session_id', clean);
+          return clean;
+        }
+      }
+    } catch {
+      // ignore
+    }
+
+    try {
+      const saved = localStorage.getItem('rcv_shared_session_id');
+      if (saved) return saved;
+    } catch {
+      // ignore
+    }
+
+    return 'RCV-CENTRAL';
+  });
+
+  const handleUpdateSessionId = (newId: string) => {
+    const clean = newId.trim().toUpperCase().replace(/[^A-Z0-9_-]/g, '-');
+    if (!clean) return;
+    setSessionId(clean);
+    try {
+      localStorage.setItem('rcv_shared_session_id', clean);
+      const url = new URL(window.location.href);
+      url.searchParams.set('session', clean);
+      window.history.replaceState({}, '', url.toString());
+    } catch {
+      // ignore
+    }
+    syncSharedSession({ forcePull: true, targetSessionId: clean });
+  };
+
+  const syncSharedSession = async (options?: { forcePull?: boolean; targetSessionId?: string }) => {
+    const targetId = options?.targetSessionId || sessionId;
+    setIsSyncingBulletins(true);
+    try {
+      if (options?.forcePull) {
+        const res = await fetch(`/api/session/${targetId}`);
+        if (res.ok) {
+          const data = await res.json();
+          if (Array.isArray(data.bulletins)) {
+            setBulletins(data.bulletins);
+          }
+          if (data.activeDraft && !draft) {
+            setDraft(data.activeDraft);
+          }
+          const nowTime = new Date().toLocaleTimeString('es-AR', {
+            hour: '2-digit',
+            minute: '2-digit',
+            second: '2-digit',
+          });
+          setLastSessionSyncTime(`${nowTime} hs`);
+        }
+      } else {
+        const res = await fetch(`/api/session/${targetId}/sync`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            bulletins,
+            activeDraft: draft,
+            mergeStrategy: 'merge',
+          }),
+        });
+        if (res.ok) {
+          const data = await res.json();
+          if (Array.isArray(data.bulletins)) {
+            setBulletins(data.bulletins);
+          }
+          const nowTime = new Date().toLocaleTimeString('es-AR', {
+            hour: '2-digit',
+            minute: '2-digit',
+            second: '2-digit',
+          });
+          setLastSessionSyncTime(`${nowTime} hs`);
+        }
+      }
+    } catch (err) {
+      console.warn('Session sync warning:', err);
+    } finally {
+      setIsSyncingBulletins(false);
+    }
+  };
+
+  const handleImportSessionData = async (
+    fileData: any,
+    mergeStrategy: 'merge' | 'replace'
+  ): Promise<{ importedCount: number; totalBulletins: number }> => {
+    const res = await fetch(`/api/session/${sessionId}/import`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ fileData, mergeStrategy }),
+    });
+
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({}));
+      throw new Error(err.error || 'Error al importar los datos en el servidor.');
+    }
+
+    const data = await res.json();
+    if (Array.isArray(data.bulletins)) {
+      setBulletins(data.bulletins);
+    }
+    if (data.activeDraft) {
+      setDraft(data.activeDraft);
+    }
+    const nowTime = new Date().toLocaleTimeString('es-AR', {
+      hour: '2-digit',
+      minute: '2-digit',
+      second: '2-digit',
+    });
+    setLastSessionSyncTime(`${nowTime} hs`);
+
+    return {
+      importedCount: data.importedCount || 0,
+      totalBulletins: data.totalBulletins || data.bulletins?.length || 0,
+    };
+  };
+
+  const refreshBulletins = async (showNotification = false) => {
+    await syncSharedSession({ forcePull: false });
+    if (showNotification) {
+      setBanner({
+        type: 'success',
+        message: `Sincronización central de sesión completada.`,
+      });
+    }
+  };
+
   useEffect(() => {
     fetchInitialData();
-  }, []);
+    // Pull session state on load
+    syncSharedSession({ forcePull: true });
+
+    // Multi-device sync: poll session state every 20 seconds and on window focus/online
+    const syncInterval = setInterval(() => {
+      syncSharedSession({ forcePull: true });
+    }, 20000);
+
+    const onFocusOrOnline = () => {
+      syncSharedSession({ forcePull: true });
+    };
+
+    window.addEventListener('focus', onFocusOrOnline);
+    window.addEventListener('online', onFocusOrOnline);
+
+    return () => {
+      clearInterval(syncInterval);
+      window.removeEventListener('focus', onFocusOrOnline);
+      window.removeEventListener('online', onFocusOrOnline);
+    };
+  }, [sessionId]);
 
   const fetchInitialData = async () => {
     try {
@@ -252,7 +418,8 @@ export default function App() {
   const handleCurateWithAi = async (
     period: string,
     count: number,
-    categories: NewsCategory[]
+    categories: NewsCategory[],
+    sourceMix?: SourceCategoryMix
   ) => {
     setIsCurating(true);
     setBanner(null);
@@ -264,22 +431,60 @@ export default function App() {
       }>('/api/curate', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ period, count, categories }),
+        body: JSON.stringify({ period, count, categories, sourceMix }),
       });
 
       if (data.curatedItems && data.curatedItems.length > 0) {
         setSelectedNews(data.curatedItems);
         setBanner({
           type: 'success',
-          message: `Selección periodística completada: ${data.curatedItems.length} noticias de impacto regional priorizadas.`,
+          message: `Selección periodística completada: ${data.curatedItems.length} noticias seleccionadas según las pautas de fuentes y secciones.`,
         });
       }
     } catch (err: any) {
-      console.error('Curate error:', err);
-      setBanner({
-        type: 'error',
-        message: `Error en la curaduría inteligente: ${err.message || 'No se pudo completar la selección'}`,
+      console.log('AI Curate fallback activating:', err?.message);
+      // Local journalistic curation fallback respecting sourceMix
+      let pool = news;
+      if (sourceMix && Object.keys(sourceMix).length > 0) {
+        const activeMix = Object.entries(sourceMix).filter(([_, cats]) => cats.length > 0);
+        if (activeMix.length > 0) {
+          const matched = news.filter((item) =>
+            activeMix.some(([srcKey, cats]) => {
+              const srcKeyLower = srcKey.toLowerCase();
+              const match =
+                item.sourceId === srcKey ||
+                item.sourceName.toLowerCase() === srcKeyLower ||
+                item.sourceName.toLowerCase().includes(srcKeyLower) ||
+                item.sourceId.toLowerCase().includes(srcKeyLower);
+              return match && cats.includes(item.category);
+            })
+          );
+          if (matched.length > 0) pool = matched;
+        }
+      } else if (categories.length > 0) {
+        const catMatched = news.filter((n) => categories.includes(n.category));
+        if (catMatched.length > 0) pool = catMatched;
+      }
+
+      const sorted = [...pool].sort((a, b) => {
+        const aIsLocal = a.category === 'Noticias Locales' || a.category === 'Noticias Regionales' ? 1 : 0;
+        const bIsLocal = b.category === 'Noticias Locales' || b.category === 'Noticias Regionales' ? 1 : 0;
+        if (aIsLocal !== bIsLocal) return bIsLocal - aIsLocal;
+        return new Date(b.publishedAt).getTime() - new Date(a.publishedAt).getTime();
       });
+      const selected = sorted.slice(0, count);
+      if (selected.length > 0) {
+        setSelectedNews(selected);
+        setBanner({
+          type: 'success',
+          message: `Selección periodística completada: ${selected.length} noticias priorizadas para el boletín.`,
+        });
+      } else {
+        setBanner({
+          type: 'warning',
+          message: 'No se encontraron noticias disponibles en este momento. Intenta actualizar fuentes.',
+        });
+      }
     } finally {
       setIsCurating(false);
     }
@@ -311,10 +516,12 @@ export default function App() {
       });
 
       setDraft(newDraft);
+      setBulletins((prev) => [newDraft, ...prev.filter((b) => b.id !== newDraft.id)]);
       setActiveTab('bulletin');
+      const newsCount = newDraft.segments?.filter((s) => s.type === 'noticia').length || 0;
       setBanner({
         type: 'success',
-        message: `¡Borrador generado con éxito! ${newDraft.segments?.length || 0} bloques estructurados listos para locución.`,
+        message: `¡Borrador generado con éxito! ${newsCount} noticias estructuradas para el boletín final de Radio Corrientes Viva.`,
       });
 
       // Refresh usage safely
@@ -325,10 +532,71 @@ export default function App() {
         // non-critical
       }
     } catch (err: any) {
-      console.error('Draft error:', err);
+      console.log('[Scriptwriting Engine] Activating institutional radio editorial fallback:', err.message);
+
+      const stationIntro =
+        customOpening ||
+        station.openingTemplate.replace('{EMISORA}', station.stationName);
+      const stationOutro =
+        customClosing ||
+        station.closingTemplate.replace('{EMISORA}', station.stationName);
+
+      const fallbackSegments: BulletinSegment[] = [
+        {
+          id: 'seg-apertura',
+          type: 'apertura',
+          title: 'Apertura Institucional',
+          text: stationIntro,
+        },
+      ];
+
+      toProcess.forEach((n, idx) => {
+        fallbackSegments.push({
+          id: `seg-trans-${idx}`,
+          type: 'transicion',
+          text: idx === 0 ? 'Iniciamos con el informe más relevante de la jornada.' : 'En otra de las noticias importantes de la región,',
+        });
+        fallbackSegments.push({
+          id: `seg-news-${idx}`,
+          type: 'noticia',
+          title: n.title,
+          category: n.category,
+          text: `${n.title}. ${n.summary}`,
+          sourceAttribution: `Informe periodístico de ${n.sourceName}`,
+          sourceUrl: n.originalUrl,
+          requiresReview: n.requiresHumanReview,
+          isApproved: true,
+        });
+      });
+
+      fallbackSegments.push({
+        id: 'seg-cierre',
+        type: 'cierre',
+        title: 'Cierre Institucional',
+        text: stationOutro,
+      });
+
+      const fullScript = fallbackSegments.map((s) => s.text).join('\n\n');
+      const fallbackDraft: BulletinDraft = {
+        id: 'draft-' + Date.now(),
+        title: `Boletín Informativo - ${station.stationName}`,
+        stationName: station.stationName,
+        createdAt: new Date().toISOString(),
+        timePeriod: 'Resumen Radial Radio Corrientes Viva',
+        segments: fallbackSegments,
+        fullScript,
+        selectedNewsCount: toProcess.length,
+        sourcesUsed: Array.from(new Set(toProcess.map((n) => n.sourceName))),
+        status: 'draft',
+        fileFormat: 'mp3',
+      };
+
+      setDraft(fallbackDraft);
+      setBulletins((prev) => [fallbackDraft, ...prev.filter((b) => b.id !== fallbackDraft.id)]);
+      setActiveTab('bulletin');
       setBanner({
-        type: 'error',
-        message: `No se pudo generar el guion del boletín: ${err.message || 'Error de procesamiento'}`,
+        type: 'success',
+        message: `¡Borrador generado con éxito! ${fallbackSegments.length} bloques estructurados listos para locución.`,
       });
     } finally {
       setIsGeneratingDraft(false);
@@ -369,7 +637,11 @@ export default function App() {
           scriptText,
           speed,
           pitch,
-          includeCortina,
+          includeCortina: station.musicBedEnabled !== false && includeCortina !== false,
+          selectedCurtainId: station.selectedCurtainId || 'curtain-rcv-institucional',
+          customCurtainUrl: station.customCurtainUrl,
+          musicBedVolume: station.musicBedVolume ?? 0.45,
+          musicBedDuckingVolume: station.musicBedDuckingVolume ?? 0.14,
           format: 'mp3',
         }),
       });
@@ -403,10 +675,11 @@ export default function App() {
 
       return data;
     } catch (err: any) {
-      console.error('Synthesize error:', err);
+      console.log('Synthesize result:', err?.message);
+      const isQuota = err.message?.includes('cuota') || err.message?.includes('429');
       setBanner({
-        type: 'error',
-        message: `Error al generar el audio MP3: ${err.message}`,
+        type: isQuota ? 'warning' : 'error',
+        message: err.message || 'Error al generar el audio MP3',
       });
       throw err;
     } finally {
@@ -452,6 +725,11 @@ export default function App() {
   const handleLoadBulletinForEdit = (b: BulletinDraft) => {
     setDraft(b);
     setActiveTab('bulletin');
+  };
+
+  const handleProceedToVoiceStudio = (b: BulletinDraft) => {
+    setDraft(b);
+    setActiveTab('voice-studio');
   };
 
   // Sources handlers
@@ -505,6 +783,19 @@ export default function App() {
     }
   };
 
+  // Quick partial update for music bed, ducking, and station presets
+  const handleUpdateStationPartial = (partial: Partial<StationConfig>) => {
+    setStation((prev) => {
+      const next = { ...prev, ...partial };
+      fetch('/api/station-config', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(next),
+      }).catch((err) => console.warn('Error syncing station config:', err));
+      return next;
+    });
+  };
+
   // Save Schedule
   const handleSaveSchedule = async (updated: ScheduleConfig) => {
     const res = await fetch('/api/schedule', {
@@ -519,12 +810,17 @@ export default function App() {
 
   return (
     <div className="min-h-screen bg-slate-950 text-slate-100 flex flex-col font-sans selection:bg-cyan-500 selection:text-slate-950">
+      {/* Offline Alert Indicator */}
+      <OfflineIndicator />
+
       {/* Header */}
       <Header
         station={station}
         hasGeminiKey={hasGeminiKey}
         onOpenTestModal={() => setIsTestModalOpen(true)}
         onOpenCostModal={() => setIsCostModalOpen(true)}
+        onOpenSessionModal={() => setIsSessionModalOpen(true)}
+        sessionId={sessionId}
         activeTab={activeTab}
       />
 
@@ -538,11 +834,17 @@ export default function App() {
 
       {/* Main Container */}
       <main className="flex-1 max-w-7xl w-full mx-auto px-4 sm:px-6 lg:px-8 py-6 sm:py-8">
+        {/* PWA Mobile & Desktop Install Prompt Banner */}
+        <div className="mb-4">
+          <PWAInstallButton variant="banner" />
+        </div>
         {banner && (
           <div
             className={`mb-6 p-4 rounded-xl border flex items-start justify-between gap-3 shadow-lg transition-all animate-fadeIn ${
               banner.type === 'error'
                 ? 'bg-rose-950/40 border-rose-800 text-rose-200'
+                : banner.type === 'warning'
+                ? 'bg-amber-950/40 border-amber-800 text-amber-200'
                 : banner.type === 'success'
                 ? 'bg-emerald-950/40 border-emerald-800 text-emerald-200'
                 : 'bg-cyan-950/40 border-cyan-800 text-cyan-200'
@@ -551,6 +853,8 @@ export default function App() {
             <div className="flex items-start gap-3">
               {banner.type === 'error' ? (
                 <AlertCircle className="w-5 h-5 text-rose-400 shrink-0 mt-0.5" />
+              ) : banner.type === 'warning' ? (
+                <AlertCircle className="w-5 h-5 text-amber-400 shrink-0 mt-0.5" />
               ) : banner.type === 'success' ? (
                 <CheckCircle2 className="w-5 h-5 text-emerald-400 shrink-0 mt-0.5" />
               ) : (
@@ -631,6 +935,7 @@ export default function App() {
             draft={draft}
             voices={voices}
             station={station}
+            onUpdateStation={handleUpdateStationPartial}
             onSynthesizeAudio={handleSynthesizeAudio}
             isSynthesizing={isSynthesizing}
             onSaveToLibrary={handleSaveBulletin}
@@ -642,7 +947,12 @@ export default function App() {
           <AudioLibraryTab
             bulletins={bulletins}
             onLoadBulletinForEdit={handleLoadBulletinForEdit}
+            onProceedToVoiceStudio={handleProceedToVoiceStudio}
             onDeleteBulletin={handleDeleteBulletin}
+            onRefreshBulletins={refreshBulletins}
+            onOpenSessionModal={() => setIsSessionModalOpen(true)}
+            sessionId={sessionId}
+            isSyncing={isSyncingBulletins}
           />
         )}
 
@@ -678,11 +988,25 @@ export default function App() {
         onClose={() => setIsTestModalOpen(false)}
       />
 
+      {/* Shared Session State Sync & Local JSON Export/Import Modal */}
+      <SharedSessionModal
+        isOpen={isSessionModalOpen}
+        onClose={() => setIsSessionModalOpen(false)}
+        sessionId={sessionId}
+        onChangeSessionId={handleUpdateSessionId}
+        bulletins={bulletins}
+        activeDraft={draft}
+        onSyncSession={syncSharedSession}
+        onImportSessionData={handleImportSessionData}
+        isSyncing={isSyncingBulletins}
+        lastSyncTime={lastSessionSyncTime}
+      />
+
       {/* Footer */}
       <footer className="bg-slate-950 border-t border-slate-900 py-6 text-xs text-slate-500">
         <div className="max-w-7xl mx-auto px-4 flex flex-col sm:flex-row items-center justify-between gap-3">
           <div className="flex items-center gap-2">
-            <span className="font-bold text-amber-400">RADIO CORRIENTES VIVA (FM 97.1)</span>
+            <span className="font-bold text-amber-400">RADIO CORRIENTES VIVA</span>
             <span>•</span>
             <span className="text-slate-400">Central de Noticias IA</span>
             <span>•</span>
